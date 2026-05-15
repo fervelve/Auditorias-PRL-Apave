@@ -876,6 +876,7 @@ function next(step){
     if(fd.contrata==='Nokia'&&!fd.accesotel){alert('Indica si se ha realizado el Accesotel.');return;}
   }
   if(step===16){if(!fd.itv){alert('Indica si se ha revisado el vehículo.');return;}}
+  if(step===17){fd.observaciones=document.getElementById('val-observaciones').value.trim();}
   if(step===18){
     const _now=new Date();_now.setMinutes(_now.getMinutes()+45);
     fd.horaFin=pad(_now.getHours())+':'+pad(_now.getMinutes());
