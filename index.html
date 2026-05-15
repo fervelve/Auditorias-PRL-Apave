@@ -660,11 +660,32 @@ details summary:hover{color:var(--accent);}
       <div class="nav"><button class="btn-back" onclick="goToStep(13)">← Atrás</button><button class="btn-next" onclick="next(14)">Siguiente →</button></div>
     </div>
 
-    <!-- 15: FIRMAS -->
-    <div class="screen" id="screen-15">
-      <div class="q-card"><span class="q-num">15 / FIRMAS</span><div class="q-title">Firmas de los intervinientes</div></div>
+    <!-- 16: ITV VEHÍCULO -->
+    <div class="screen" id="screen-16">
+      <div><span class="q-num">16 / VEHÍCULO</span><div class="q-title">¿Se ha revisado y está correcto la ITV, neumáticos y separación de carga del vehículo?</div></div>
+      <div class="opts">
+        <button class="opt" onclick="selectOpt('itv',this,'Sí')">Sí</button>
+        <button class="opt" onclick="selectOpt('itv',this,'No')">No</button>
+      </div>
+      <div id="itv-no" style="display:none;" class="cond">
+        <div class="cond-label">Describe la incidencia (se añadirá a incidencias):</div>
+        <textarea class="inp" id="val-itv-obs" rows="2" placeholder="Ej: ITV caducada, neumáticos desgastados..." oninput="fd.itvObs=this.value"></textarea>
+      </div>
+      <div class="nav"><button class="btn-back" onclick="goToStep(15)">← Atrás</button><button class="btn-next" onclick="next(16)">Siguiente →</button></div>
+    </div>
+
+    <!-- 17: OBSERVACIONES -->
+    <div class="screen" id="screen-17">
+      <div><span class="q-num">17 / OBSERVACIONES</span><div class="q-title">Observaciones adicionales</div><div class="q-sub">Opcional — si no se escribe nada no aparecerá en el documento exportado</div></div>
+      <textarea class="inp" id="val-observaciones" rows="5" placeholder="Escribe aquí cualquier observación adicional..." style="margin-top:8px;" oninput="fd.observaciones=this.value"></textarea>
+      <div class="nav"><button class="btn-back" onclick="goToStep(16)">← Atrás</button><button class="btn-next" onclick="next(17)">Siguiente →</button></div>
+    </div>
+
+    <!-- 18: FIRMAS -->
+    <div class="screen" id="screen-18">
+      <div class="q-card"><span class="q-num">18 / FIRMAS</span><div class="q-title">Firmas de los intervinientes</div></div>
       <div class="sig-wrap">
-        <div class="sig-label">✍️ Firma del Coordinador / Vigilante de Seguridad<br><small style="color:var(--text3);">Fernando Velázquez Vega</small></div>
+        <div class="sig-label">✍️ Firma del Coordinador / Vigilante de Seguridad<br><small style="color:var(--text3);" id="sig-coord-name"></small></div>
         <canvas class="sig-canvas" id="sig-coord" width="480" height="130"></canvas>
         <div class="sig-actions"><button class="btn-clear" onclick="clearSig('sig-coord')">Borrar firma</button></div>
       </div>
@@ -678,8 +699,8 @@ details summary:hover{color:var(--accent);}
         <div class="sig-actions"><button class="btn-clear" onclick="clearSig('sig-resp')">Borrar firma</button></div>
       </div>
       <div class="nav">
-        <button class="btn-back" id="btn-back-15" onclick="backFrom15()">← Atrás</button>
-        <button class="btn-next" onclick="next(15)">Finalizar y ver resumen</button>
+        <button class="btn-back" id="btn-back-18" onclick="backFrom18()">← Atrás</button>
+        <button class="btn-next" onclick="next(18)">Finalizar y ver resumen</button>
       </div>
     </div>
 
@@ -699,7 +720,7 @@ details summary:hover{color:var(--accent);}
 </div>
 
 <script>
-const TOTAL=15;
+const TOTAL=18;
 let fd={};
 let technicians=[];
 
@@ -766,7 +787,8 @@ function goToStep(n){
     document.getElementById('bloque-huawei').style.display=fd.contrata==='Huawei'?'block':'none';
     document.getElementById('bloque-nokia').style.display=fd.contrata==='Nokia'?'block':'none';
   }
-  if(n===15){
+  if(n===18){
+    document.getElementById('sig-coord-name').textContent=fd.coordinador||'';
     const sel=document.getElementById('val-responsable');
     const prev=sel.value;
     sel.innerHTML='<option value="">— Selecciona el responsable —</option>';
@@ -786,9 +808,8 @@ function goToStep(n){
   }
 }
 
-function backFrom15(){
-  if(fd.contrata==='Huawei'||fd.contrata==='Nokia') goToStep(14);
-  else goToStep(13);
+function backFrom18(){
+  goToStep(17);
 }
 
 function selectOpt(key,btn,val){
@@ -812,6 +833,7 @@ function selectOpt(key,btn,val){
     }
     if(key==='incAlt'){document.getElementById('incalt-si').style.display=val==='Sí'?'flex':'none';}
     if(key==='epis'){document.getElementById('epis-no').style.display=val==='No'?'flex':'none';}
+    if(key==='itv'){document.getElementById('itv-no').style.display=val==='No'?'flex':'none';}
     if(key==='maquinaria'){document.getElementById('maquinaria-si').style.display=val==='Sí'?'flex':'none'; if(val==='No'){fd.maquinariaDoc='';fd.maquinariaObs='';document.getElementById('maquinaria-doc-no').style.display='none';}}
     if(key==='maquinariaDoc'){document.getElementById('maquinaria-doc-no').style.display=val==='No'?'flex':'none';}
     if(key==='docObra'){document.getElementById('docobra-no').style.display=val==='No'?'flex':'none';}
@@ -853,7 +875,8 @@ function next(step){
     if(fd.contrata==='Huawei'&&!fd.qcehs){alert('Indica si se ha realizado el QC-EHS.');return;}
     if(fd.contrata==='Nokia'&&!fd.accesotel){alert('Indica si se ha realizado el Accesotel.');return;}
   }
-  if(step===15){
+  if(step===16){if(!fd.itv){alert('Indica si se ha revisado el vehículo.');return;}}
+  if(step===18){
     const _now=new Date();_now.setMinutes(_now.getMinutes()+45);
     fd.horaFin=pad(_now.getHours())+':'+pad(_now.getMinutes());
     fd.responsable=document.getElementById('val-responsable').value.trim();
@@ -865,9 +888,10 @@ function next(step){
   // Saltar paso 14 si no es Huawei ni Nokia
   if(step===13){
     if(fd.contrata==='Huawei'||fd.contrata==='Nokia') goToStep(14);
-    else goToStep(15);
+    else goToStep(16);
     return;
   }
+  if(step===14){ goToStep(16); return; }
   goToStep(step+1);
 }
 
@@ -1083,6 +1107,7 @@ function updateSidebar(){
 function getIncidencias(){
   const inc=[];
   if(fd.epis==='No') inc.push('Uso incorrecto de EPIs básicos'+(fd.episObs?': '+fd.episObs:'.'));
+  if(fd.itv==='No') inc.push('ITV, neumáticos o separación de carga del vehículo incorrectos'+(fd.itvObs?': '+fd.itvObs:'.'));
   if(fd.maquinaria==='Sí'&&fd.maquinariaDoc==='No') inc.push('Maquinaria sin acreditación o documentación incompleta'+(fd.maquinariaObs?': '+fd.maquinariaObs:'.'));
   if(fd.incAlt==='Sí') inc.push('Incidencia que impide trabajos en altura'+(fd.incAltDesc?': '+fd.incAltDesc:'.'));
   if(fd.qcehs==='No') inc.push('QC-EHS no realizado'+(fd.qcehsObs?': '+fd.qcehsObs:'.'));
@@ -1389,6 +1414,12 @@ function _fillDoc(doc, W, H){
     if(fd.accesotel==='Sí'&&fd.accesotelNum) acc+=' — Nº: '+fd.accesotelNum;
     if(fd.accesotel==='No'&&fd.accesotelObs) acc+=' — '+fd.accesotelObs;
     obsLine(acc);
+  }
+  if(fd.itv==='Sí') obsLine('• Revisado ITV, neumáticos y separación de carga');
+  if(fd.observaciones&&fd.observaciones.trim()){
+    obsLine('');
+    obsLine('OBSERVACIONES ADICIONALES:', true);
+    obsLine(fd.observaciones.trim());
   }
   oy += 2;
 
