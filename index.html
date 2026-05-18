@@ -517,6 +517,8 @@ details summary:hover{color:var(--accent);}
         <button class="opt" onclick="selectOpt('site',this,'Torre + Outdoor')">Torre + Outdoor</button>
         <button class="opt" onclick="selectOpt('site',this,'Azotea + Caseta')">Azotea + Caseta</button>
         <button class="opt" onclick="selectOpt('site',this,'Azotea + Outdoor')">Azotea + Outdoor</button>
+        <button class="opt" onclick="selectOpt('site',this,'Torre + Sala H.')">Torre + Sala H.</button>
+        <button class="opt" onclick="selectOpt('site',this,'Azotea + Sala H.')">Azotea + Sala H.</button>
         <button class="opt" onclick="selectOpt('site',this,'Microsite')">Microsite</button>
         <button class="opt" onclick="selectOpt('site',this,'__otra__')">Otro</button>
       </div>
@@ -656,8 +658,32 @@ details summary:hover{color:var(--accent);}
           <div class="cond-label">¿Qué no está realizado? (se añadirá a incidencias)</div>
           <textarea class="inp" id="val-accesotel-obs" rows="2" placeholder="Ej: NDPD pendiente, Anexo 4 sin firmar..." oninput="fd.accesotelObs=this.value"></textarea>
         </div>
+        <div style="margin-top:14px;">
+          <div class="cond-label" style="font-weight:600;">¿Los técnicos conocen las Nokia Life Saving Rules?</div>
+          <div class="opts" style="margin-top:6px;">
+            <button class="opt" onclick="selectOpt('nokiaLSR',this,'Sí')">Sí</button>
+            <button class="opt" onclick="selectOpt('nokiaLSR',this,'No')">No</button>
+          </div>
+          <div id="nokiaLSR-no" style="display:none;" class="cond">
+            <div class="cond-label">Se añadirá a incidencias: técnicos sin conocimiento de Nokia Life Saving Rules.</div>
+          </div>
+        </div>
       </div>
       <div class="nav"><button class="btn-back" onclick="goToStep(13)">← Atrás</button><button class="btn-next" onclick="next(14)">Siguiente →</button></div>
+    </div>
+
+    <!-- 15: RECURSO PREVENTIVO -->
+    <div class="screen" id="screen-15">
+      <div><span class="q-num">15 / RECURSO PREVENTIVO</span><div class="q-title">¿Hay R.P. designado y está utilizando el brazalete?</div></div>
+      <div class="opts">
+        <button class="opt" onclick="selectOpt('rp',this,'Sí')">Sí</button>
+        <button class="opt" onclick="selectOpt('rp',this,'No')">No</button>
+        <button class="opt" onclick="selectOpt('rp',this,'N/A')">N/A</button>
+      </div>
+      <div id="rp-no" style="display:none;" class="cond">
+        <div class="cond-label">Se añadirá a incidencias: R.P. no designado o sin brazalete.</div>
+      </div>
+      <div class="nav"><button class="btn-back" onclick="goToStep(14)">← Atrás</button><button class="btn-next" onclick="next(15)">Siguiente →</button></div>
     </div>
 
     <!-- 16: ITV VEHÍCULO -->
@@ -720,7 +746,7 @@ details summary:hover{color:var(--accent);}
 </div>
 
 <script>
-const TOTAL=18;
+const TOTAL=19;
 let fd={};
 let technicians=[];
 
@@ -833,6 +859,8 @@ function selectOpt(key,btn,val){
     }
     if(key==='incAlt'){document.getElementById('incalt-si').style.display=val==='Sí'?'flex':'none';}
     if(key==='epis'){document.getElementById('epis-no').style.display=val==='No'?'flex':'none';}
+    if(key==='rp'){document.getElementById('rp-no').style.display=val==='No'?'flex':'none';}
+    if(key==='nokiaLSR'){document.getElementById('nokiaLSR-no').style.display=val==='No'?'flex':'none';}
     if(key==='itv'){document.getElementById('itv-no').style.display=val==='No'?'flex':'none';}
     if(key==='maquinaria'){document.getElementById('maquinaria-si').style.display=val==='Sí'?'flex':'none'; if(val==='No'){fd.maquinariaDoc='';fd.maquinariaObs='';document.getElementById('maquinaria-doc-no').style.display='none';}}
     if(key==='maquinariaDoc'){document.getElementById('maquinaria-doc-no').style.display=val==='No'?'flex':'none';}
@@ -875,6 +903,7 @@ function next(step){
     if(fd.contrata==='Huawei'&&!fd.qcehs){alert('Indica si se ha realizado el QC-EHS.');return;}
     if(fd.contrata==='Nokia'&&!fd.accesotel){alert('Indica si se ha realizado el Accesotel.');return;}
   }
+  if(step===15){if(!fd.rp){alert('Indica si hay R.P. designado.');return;}}
   if(step===16){if(!fd.itv){alert('Indica si se ha revisado el vehículo.');return;}}
   if(step===17){fd.observaciones=document.getElementById('val-observaciones').value.trim();}
   if(step===18){
@@ -889,10 +918,10 @@ function next(step){
   // Saltar paso 14 si no es Huawei ni Nokia
   if(step===13){
     if(fd.contrata==='Huawei'||fd.contrata==='Nokia') goToStep(14);
-    else goToStep(16);
+    else goToStep(15);
     return;
   }
-  if(step===14){ goToStep(16); return; }
+  if(step===14){ goToStep(15); return; }
   goToStep(step+1);
 }
 
@@ -1108,10 +1137,12 @@ function updateSidebar(){
 function getIncidencias(){
   const inc=[];
   if(fd.epis==='No') inc.push('Uso incorrecto de EPIs básicos'+(fd.episObs?': '+fd.episObs:'.'));
+  if(fd.rp==='No') inc.push('R.P. no designado o sin brazalete.');
   if(fd.itv==='No') inc.push('ITV, neumáticos o separación de carga del vehículo incorrectos'+(fd.itvObs?': '+fd.itvObs:'.'));
   if(fd.maquinaria==='Sí'&&fd.maquinariaDoc==='No') inc.push('Maquinaria sin acreditación o documentación incompleta'+(fd.maquinariaObs?': '+fd.maquinariaObs:'.'));
   if(fd.incAlt==='Sí') inc.push('Incidencia que impide trabajos en altura'+(fd.incAltDesc?': '+fd.incAltDesc:'.'));
   if(fd.qcehs==='No') inc.push('QC-EHS no realizado'+(fd.qcehsObs?': '+fd.qcehsObs:'.'));
+  if(fd.nokiaLSR==='No') inc.push('Técnicos sin conocimiento de Nokia Life Saving Rules.');
   if(fd.accesotel==='No') inc.push('Accesotel/NDPD/Anexo 4/Adenda pendiente'+(fd.accesotelObs?': '+fd.accesotelObs:'.'));
   if(fd.docObra==='No') inc.push('Documentación de obra incompleta'+(fd.docObraObs?': '+fd.docObraObs:'.'));
   if(fd.botiquin==='No') inc.push('Botiquín, extintor o EPIs de obra incorrectos'+(fd.botiquinObs?': '+fd.botiquinObs:'.'));
@@ -1394,7 +1425,7 @@ function _fillDoc(doc, W, H){
   if(fd.altura==='Sí'){
     obsLine('• Trabajos en altura: Sí — Anclaje: '+(fd.anclaje||'—')+(fd.revision?' — Última revisión: '+fd.revision:''));
   } else if(fd.altura==='No'){
-    obsLine('• Trabajos en altura: No'+(fd.incAlt==='Sí'?' — Incidencia: '+(fd.incAltDesc||''):''));
+    if(fd.incAlt==='Sí') obsLine('• Trabajos en altura: No — Incidencia: '+(fd.incAltDesc||'')); else obsLine('• Trabajos en altura: No');
   }
   if(fd.epis==='Sí') obsLine('• Uso correcto de EPIs básicos: Sí');
   else if(fd.epis==='No') obsLine('• Uso correcto de EPIs básicos: No'+(fd.episObs?' — '+fd.episObs:''));
@@ -1410,12 +1441,14 @@ function _fillDoc(doc, W, H){
   if(fd.contrata==='Huawei'){
     obsLine('• QC-EHS realizado: '+(fd.qcehs||'—')+(fd.qcehs==='No'&&fd.qcehsObs?' — '+fd.qcehsObs:''));
   }
+  if(fd.contrata==='Nokia'&&fd.nokiaLSR) obsLine('• Nokia Life Saving Rules conocidas: '+(fd.nokiaLSR||'—'));
   if(fd.contrata==='Nokia'){
     let acc='• Accesotel/NDPD/Anexo 4/Adenda: '+(fd.accesotel||'—');
     if(fd.accesotel==='Sí'&&fd.accesotelNum) acc+=' — Nº: '+fd.accesotelNum;
     if(fd.accesotel==='No'&&fd.accesotelObs) acc+=' — '+fd.accesotelObs;
     obsLine(acc);
   }
+  if(fd.rp) obsLine('• R.P. designado con brazalete: '+(fd.rp||'—'));
   if(fd.itv==='Sí') obsLine('• Revisado ITV, neumáticos y separación de carga');
   if(fd.observaciones&&fd.observaciones.trim()){
     obsLine('');
