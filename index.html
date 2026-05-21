@@ -1076,18 +1076,46 @@ async function getGPS(){
     fd.lat=lat;fd.lng=lng;
     setGV('gps-lat',lat);setGV('gps-lng',lng);
     btn.textContent='📍 Ubicación obtenida ✓';btn.style.opacity='1';
+
+    // Intentar Nominatim online (dirección completa)
+    let nominatimOk=false;
     try{
-      const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es`);
+      const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es`,{signal:AbortSignal.timeout(6000)});
       const d=await r.json();
       const a=d.address||{};
       fd.poblacion=a.city||a.town||a.village||a.municipality||'';
       fd.provincia=a.province||a.state||'';
       fd.cp=a.postcode||'';
-      setGV('gps-pob',fd.poblacion||'—');setGV('gps-prov',fd.provincia||'—');setGV('gps-cp',fd.cp||'—');
+      // Calle y número + coordenadas → campo situación
+      const calle=a.road||a.pedestrian||a.footway||'';
+      const numero=a.house_number||'';
+      let dir='';
+      if(calle) dir=calle+(numero?' '+numero:'');
+      dir+=(dir?' — ':'')+lat+', '+lng;
+      fd.situacion=dir;
+      setGV('gps-pob',fd.poblacion||'—');
+      setGV('gps-prov',fd.provincia||'—');
+      setGV('gps-cp',fd.cp||'—');
+      const sitEl=document.getElementById('val-situacion');
+      if(sitEl) sitEl.value=dir;
       updateSidebar();
-    }catch(e){
-      // Si Nominatim falla, dejar los campos editables manualmente
-      btn.textContent='📍 GPS obtenido (rellena población manualmente)';
+      nominatimOk=true;
+    }catch(e){ nominatimOk=false; }
+
+    // Si Nominatim falló (sin internet), usar BD local para población/provincia
+    if(!nominatimOk){
+      try{
+        const m=getMunicipioFromCoords(parseFloat(lat),parseFloat(lng));
+        if(m){
+          fd.poblacion=m.n; fd.provincia=m.p;
+          setGV('gps-pob',m.n); setGV('gps-prov',m.p);
+          updateSidebar();
+        }
+        const sitEl2=document.getElementById('val-situacion');
+        const coordStr=lat+', '+lng;
+        fd.situacion=coordStr;
+        if(sitEl2) sitEl2.value=coordStr;
+      }catch(e2){ btn.textContent='📍 GPS obtenido — completa los campos manualmente'; }
     }
   },err=>{
     btn.textContent='📍 Obtener ubicación por GPS';btn.style.opacity='1';
@@ -1391,80 +1419,130 @@ function _fillDoc(doc, W, H){
 
   // TEMAS TRATADOS / OBSERVACIONES
   // +5mm abajo (0.5cm): 138 + 5 = 143, -2mm izquierda: 20.9 - 2 = 18.9
-  let oy = 143;
   const ox = 18.9;
   const omaxW = 178;
-  const oLineH = 4.0;
+  const Y_TOP = 143;    // inicio del área temas tratados (mm)
+  const Y_BOTTOM = 250; // fin real del área en la plantilla (mm)
 
-  function obsLine(text, bold, red){
-    if(oy > 207) return;
+  // ── Función para calcular cuántas líneas ocupa todo el contenido ──
+  function countLines(items, fs){
+    let total = 0;
+    items.forEach(({text})=>{
+      const lines = doc.splitTextToSize(String(text||''), omaxW);
+      total += lines.length;
+    });
+    return total;
+  }
+
+  // ── Construir lista completa de líneas a renderizar ──
+  function buildLines(){
+    const lines = [];
+    const add = (text, bold=false, red=false) => lines.push({text, bold, red});
+
+    // Técnicos
+    if(technicians.length > 0){
+      add('TÉCNICOS PRESENTES:', true);
+      technicians.forEach(t=>{
+        add('• '+t.name+'   DNI: '+t.dni);
+        add('   Grupos de riesgo acreditados: '+(t.gr||'No indicado'));
+      });
+      add('');
+    }
+
+    // Temas tratados
+    add('TEMAS TRATADOS:', true);
+    add('• Tipo de site: '+(fd.site||'—'));
+    if(fd.altura==='Sí'){
+      add('• Trabajos en altura: Sí — Anclaje: '+(fd.anclaje||'—')+(fd.revision?' — Última revisión: '+fd.revision:''));
+    } else if(fd.altura==='No'){
+      if(fd.incAlt==='Sí') add('• Trabajos en altura: No — Incidencia: '+(fd.incAltDesc||''));
+      else add('• Trabajos en altura: No');
+    }
+    if(fd.epis==='Sí') add('• Uso correcto de EPIs básicos: Sí');
+    else if(fd.epis==='No') add('• Uso correcto de EPIs básicos: No'+(fd.episObs?' — '+fd.episObs:''));
+    add('• Documentación en obra: '+(fd.docObra||'—')+(fd.docObra==='No'&&fd.docObraObs?' — Falta: '+fd.docObraObs:''));
+    add('• Botiquín, extintor y EPIs: '+(fd.botiquin||'—')+(fd.botiquin==='No'&&fd.botiquinObs?' — '+fd.botiquinObs:''));
+    if(fd.maquinaria==='Sí'){
+      let maqLine='• Maquinaria en obra: Sí — Documentación acreditada: '+(fd.maquinariaDoc||'—');
+      if(fd.maquinariaDoc==='No'&&fd.maquinariaObs) maqLine+=' — '+fd.maquinariaObs;
+      add(maqLine);
+    } else if(fd.maquinaria==='No'){
+      add('• Maquinaria en obra: No');
+    }
+    if(fd.contrata==='Huawei'){
+      add('• QC-EHS realizado: '+(fd.qcehs||'—')+(fd.qcehs==='No'&&fd.qcehsObs?' — '+fd.qcehsObs:''));
+    }
+    if(fd.contrata==='Nokia'&&fd.nokiaLSR) add('• Nokia Life Saving Rules conocidas: '+(fd.nokiaLSR||'—'));
+    if(fd.contrata==='Nokia'){
+      let acc='• Accesotel/NDPD/Anexo 4/Adenda: '+(fd.accesotel||'—');
+      if(fd.accesotel==='Sí'&&fd.accesotelNum) acc+=' — Nº: '+fd.accesotelNum;
+      if(fd.accesotel==='No'&&fd.accesotelObs) acc+=' — '+fd.accesotelObs;
+      add(acc);
+    }
+    if(fd.rp) add('• R.P. designado con brazalete: '+(fd.rp||'—'));
+    if(fd.itv==='Sí') add('• Revisado ITV, neumáticos y separación de carga');
+    if(fd.lat) add('• Coordenadas GPS: '+fd.lat+', '+fd.lng);
+    if(fd.observaciones&&fd.observaciones.trim()){
+      add('');
+      add('OBSERVACIONES ADICIONALES:', true);
+      doc.splitTextToSize(fd.observaciones.trim(), omaxW).forEach(l=>add(l));
+    }
+    add('');
+    add('INCIDENCIAS:', true);
+    const incList = getIncidencias();
+    if(incList.length===0){
+      add('No se detectan incidencias.');
+    } else {
+      incList.forEach((inc,i)=>add((i+1)+'. '+inc, false, true));
+    }
+    return lines;
+  }
+
+  // ── Calcular fontSize óptimo ──
+  const allLines = buildLines();
+  let fontSize = 7.8;
+  const minFontSize = 5.0;
+
+  // Calcular altura total con fontSize actual
+  function calcTotalHeight(fs){
+    const lineH = fs * 0.52; // proporción línea/fuente
+    let total = 0;
+    allLines.forEach(({text})=>{
+      doc.setFontSize(fs);
+      const lines = doc.splitTextToSize(String(text||''), omaxW);
+      total += lines.length * lineH;
+    });
+    return total;
+  }
+
+  const availHeight = Y_BOTTOM - Y_TOP;
+  while(fontSize > minFontSize && calcTotalHeight(fontSize) > availHeight){
+    fontSize -= 0.3;
+  }
+
+  // ── Renderizar con el fontSize calculado ──
+  const oLineH = fontSize * 0.52;
+  let oy = Y_TOP;
+
+  function obsLine(text, bold=false, red=false){
     doc.setFont('helvetica', bold?'bold':'normal');
-    doc.setFontSize(7.8);
+    doc.setFontSize(fontSize);
     if(red) doc.setTextColor(160,20,20);
     else doc.setTextColor(15,15,15);
     const lines = doc.splitTextToSize(String(text||''), omaxW);
-    lines.forEach((l,i)=>{
-      if(oy + i*oLineH <= 207) doc.text(l, ox, oy + i*oLineH);
+    lines.forEach(l=>{
+      doc.text(l, ox, oy);
+      oy += oLineH;
     });
-    oy += lines.length * oLineH;
   }
 
-  // Técnicos
-  if(technicians.length > 0){
-    obsLine('TÉCNICOS PRESENTES:', true);
-    technicians.forEach(t=>{
-      obsLine('• '+t.name+'   DNI: '+t.dni);
-      obsLine('   Grupos de riesgo acreditados: '+(t.gr||'No indicado'));
-    });
-    oy += 1.5;
-  }
+  // Renderizar todas las líneas
+  allLines.forEach(({text, bold, red})=>obsLine(text, bold, red));
 
-  // Temas tratados
-  obsLine('TEMAS TRATADOS:', true);
-  obsLine('• Tipo de site: '+(fd.site||'—'));
-  if(fd.altura==='Sí'){
-    obsLine('• Trabajos en altura: Sí — Anclaje: '+(fd.anclaje||'—')+(fd.revision?' — Última revisión: '+fd.revision:''));
-  } else if(fd.altura==='No'){
-    if(fd.incAlt==='Sí') obsLine('• Trabajos en altura: No — Incidencia: '+(fd.incAltDesc||'')); else obsLine('• Trabajos en altura: No');
-  }
-  if(fd.epis==='Sí') obsLine('• Uso correcto de EPIs básicos: Sí');
-  else if(fd.epis==='No') obsLine('• Uso correcto de EPIs básicos: No'+(fd.episObs?' — '+fd.episObs:''));
-  obsLine('• Documentación en obra: '+(fd.docObra||'—')+(fd.docObra==='No'&&fd.docObraObs?' — Falta: '+fd.docObraObs:''));
-  obsLine('• Botiquín, extintor y EPIs: '+(fd.botiquin||'—')+(fd.botiquin==='No'&&fd.botiquinObs?' — '+fd.botiquinObs:''));
-  if(fd.maquinaria==='Sí'){
-    let maqLine='• Maquinaria en obra: Sí — Documentación acreditada: '+(fd.maquinariaDoc||'—');
-    if(fd.maquinariaDoc==='No'&&fd.maquinariaObs) maqLine+=' — '+fd.maquinariaObs;
-    obsLine(maqLine);
-  } else if(fd.maquinaria==='No'){
-    obsLine('• Maquinaria en obra: No');
-  }
-  if(fd.contrata==='Huawei'){
-    obsLine('• QC-EHS realizado: '+(fd.qcehs||'—')+(fd.qcehs==='No'&&fd.qcehsObs?' — '+fd.qcehsObs:''));
-  }
-  if(fd.contrata==='Nokia'&&fd.nokiaLSR) obsLine('• Nokia Life Saving Rules conocidas: '+(fd.nokiaLSR||'—'));
-  if(fd.contrata==='Nokia'){
-    let acc='• Accesotel/NDPD/Anexo 4/Adenda: '+(fd.accesotel||'—');
-    if(fd.accesotel==='Sí'&&fd.accesotelNum) acc+=' — Nº: '+fd.accesotelNum;
-    if(fd.accesotel==='No'&&fd.accesotelObs) acc+=' — '+fd.accesotelObs;
-    obsLine(acc);
-  }
-  if(fd.rp) obsLine('• R.P. designado con brazalete: '+(fd.rp||'—'));
-  if(fd.itv==='Sí') obsLine('• Revisado ITV, neumáticos y separación de carga');
-  if(fd.observaciones&&fd.observaciones.trim()){
-    obsLine('');
-    obsLine('OBSERVACIONES ADICIONALES:', true);
-    obsLine(fd.observaciones.trim());
-  }
-  oy += 2;
+  // Separador visual antes de incidencias (dibujar línea)
+  // (ya incluido en buildLines como línea vacía)
 
-  // Incidencias
-  const incList = getIncidencias();
-  obsLine('INCIDENCIAS:', true);
-  if(incList.length===0){
-    obsLine('No se detectan incidencias.');
-  } else {
-    incList.forEach((inc,i) => obsLine((i+1)+'. '+inc, false, true));
-  }
+
 
   // ══ FIRMAS ══
   // Coordenadas desde plantilla: izquierda x=15.9, y=255.7, w=58.6, h=13.8
